@@ -2,15 +2,17 @@
 
 # Server side code
 
+import sys
+import os
+
 import configparser
+from threading import Thread
+from socket import AF_INET, socket, SOCK_STREAM
+
 import base64
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
-import sys
-import os
-from socket import AF_INET, socket, SOCK_STREAM
-from threading import Thread
 
 os.system("clear")
 print ("""
@@ -76,6 +78,7 @@ def handle_client(client): # Takes client socket as argument
     msg = b"%s has joined the DarkRoom." % name
     broadcast(encrypt(key, msg))
     clients[client] = name
+
     while True:
         msg = client.recv(BUFFER_SIZE)
         msg = decrypt(key, msg)
@@ -100,6 +103,9 @@ if __name__ == "__main__":
     server.listen(30)
     print("Server listening on port " + str(PORT) + "....")
     ACCEPT_THREAD = Thread(target=accept_incoming_connections)
-    ACCEPT_THREAD.start() # Starts the infinite loop.
-    ACCEPT_THREAD.join()
-    server.close()
+    try:
+        ACCEPT_THREAD.start() # Starts the infinite loop.
+        ACCEPT_THREAD.join()
+    except (KeyboardInterrupt, SystemExit):
+        server.close()
+        sys.exit()
