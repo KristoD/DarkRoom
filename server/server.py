@@ -3,8 +3,11 @@
 # Server side code
 
 import configparser
+import base64
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
 import sys
-import signal
 import os
 from socket import AF_INET, socket, SOCK_STREAM
 from threading import Thread
@@ -18,7 +21,6 @@ print ("""
        server v 1.0 | Kristo
 
 """)
-
 # Server config
 
 clients = {}
@@ -29,11 +31,28 @@ config.read(r'darkroom.conf')
 
 HOST = config.get('config', 'HOST')
 PORT = int(config.get('config', 'PORT'))
+PASSWORD = config.get('config', 'PASSWORD')
+key = bytes(PASSWORD, 'utf-8')
 BUFFER_SIZE = 1024
 ADDRESS = (HOST, PORT)
 
 server = socket(AF_INET, SOCK_STREAM)
 server.bind(ADDRESS)
+
+# Encryption functions
+
+def get_key(password):
+    digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+    digest.update(password)
+    return base64.urlsafe_b64encode(digest.finalize())
+
+def encrypt(password, token):
+    f = Fernet(get_key(password))
+    return f.encrypt(bytes(token))
+
+def decrypt(password, token):
+    f = Fernet(get_key(password))
+    return f.decrypt(bytes(token))
 
 # Accepting connections
 
@@ -42,7 +61,7 @@ def accept_incoming_connections():
     while True:
         client, client_address = server.accept()
         print("%s:%s has connected." % client_address)
-        client.send(bytes("Welcome to DarkRoom. Enter your alias.", "utf8"))
+        client.send(encrypt(key, b"Welcome to DarkRoom. Enter your alias."))
         addresses[client] = client_address
         Thread(target=handle_client, args=(client,)).start()
 
@@ -50,28 +69,30 @@ def accept_incoming_connections():
 
 def handle_client(client): # Takes client socket as argument
     # Handles a single client connection
-    name = client.recv(BUFFER_SIZE).decode("utf8")
-    welcome = 'You have entered the DarkRoom. If you want to quit, type {quit} to exit.'
-    client.send(bytes(welcome, "utf8"))
-    msg = "%s has joined the DarkRoom."
-    broadcast(bytes(msg, "utf8"))
+    name = client.recv(BUFFER_SIZE)
+    name = decrypt(key, name)
+    welcome = b'You have entered the DarkRoom. If you want to quit, type {quit} to exit.'
+    client.send(encrypt(key, welcome))
+    msg = b"%s has joined the DarkRoom." % name
+    broadcast(encrypt(key, msg))
     clients[client] = name
     while True:
         msg = client.recv(BUFFER_SIZE)
-        if msg != bytes("{quit}", "utf8"):
-            broadcast(msg, name+": ")
+        msg = decrypt(key, msg)
+        if msg != "{quit}":
+            broadcast(encrypt(key, bytes(name + b": " + msg)))
         else:
-            client.send(bytes("{quit}", "utf8"))
+            client.send(encrypt(key, b"{quit}"))
             client.close()
             del clients[client]
-            broadcast(bytes("%s has left the DarkRoom." % name, "utf8"))
+            broadcast(encrypt(key, b"%s has left the DarkRoom." % name))
             break
 
 # Broadcasts message to all users
 
-def broadcast(msg, prefix=""): # prefix is for name identification
+def broadcast(msg):
     for sock in clients:
-        sock.send(bytes(prefix, "utf8") + msg)
+        sock.send(msg)
 
 # Start server and listen for incoming connections
 
