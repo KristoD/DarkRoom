@@ -8,8 +8,8 @@ from tkinter import ttk
 from threading import Thread
 from socket import AF_INET, socket, SOCK_STREAM
 
-import base64
 import sys
+import base64
 from cryptography.fernet import Fernet
 from cryptography.fernet import InvalidToken
 from cryptography.hazmat.primitives import hashes
@@ -82,7 +82,7 @@ def send(event=None):  # event is passed by binders.
     client_socket.send(encrypt(key, bytes(msg, 'utf-8')))
     if msg == "{quit}":
         client_socket.close()
-        top.quit()
+        top.after(100, top.quit)
         sys.exit()
 
 # This function is to be called when the window is closed.
@@ -125,7 +125,8 @@ client_socket.connect(ADDRESS)
 receive_thread = Thread(target=receive)
 try:
     receive_thread.start()
+    top.mainloop() # Starts GUI execution.
+    receive_thread.join()
 except (KeyboardInterrupt, SystemExit):
+    top.quit()
     sys.exit()
-
-tkinter.mainloop() # Starts GUI execution.

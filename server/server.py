@@ -11,8 +11,11 @@ from socket import AF_INET, socket, SOCK_STREAM
 
 import base64
 from cryptography.fernet import Fernet
+from cryptography.fernet import InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
+
+# Terminal retro logo
 
 os.system("clear")
 print ("""
@@ -23,6 +26,7 @@ print ("""
        server v 1.0 | Kristo
 
 """)
+
 # Server config
 
 clients = {}
@@ -49,12 +53,18 @@ def get_key(password):
     return base64.urlsafe_b64encode(digest.finalize())
 
 def encrypt(password, token):
-    f = Fernet(get_key(password))
-    return f.encrypt(bytes(token))
+    try:
+        f = Fernet(get_key(password))
+        return f.encrypt(bytes(token))
+    except InvalidToken:
+        print("User entered wrong password")
 
 def decrypt(password, token):
-    f = Fernet(get_key(password))
-    return f.decrypt(bytes(token))
+    try:
+        f = Fernet(get_key(password))
+        return f.decrypt(bytes(token))
+    except InvalidToken:
+        print("User entered wrong password")
 
 # Accepting connections
 
@@ -82,10 +92,11 @@ def handle_client(client): # Takes client socket as argument
     while True:
         msg = client.recv(BUFFER_SIZE)
         msg = decrypt(key, msg)
-        if msg != "{quit}":
+        if msg != b"{quit}":
             broadcast(encrypt(key, bytes(name + b": " + msg)))
         else:
             client.send(encrypt(key, b"{quit}"))
+            print("%s:%s has disconnected." % addresses[client])
             client.close()
             del clients[client]
             broadcast(encrypt(key, b"%s has left the DarkRoom." % name))
