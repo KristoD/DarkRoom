@@ -14,7 +14,6 @@ class ClientEncryption:
             return base64.urlsafe_b64encode(digest.finalize())
         except InvalidToken:
             print("Invalid password")
-            top.quit()
             sys.exit()
 
     def encrypt(self, password, token):
@@ -23,7 +22,6 @@ class ClientEncryption:
             return f.encrypt(bytes(token))
         except InvalidToken:
             print("Invalid password.")
-            top.quit()
             sys.exit()
 
     def decrypt(self, password, token):
@@ -32,6 +30,5 @@ class ClientEncryption:
             return f.decrypt(bytes(token))
         except InvalidToken:
             print("Invalid password.")
-            top.quit()
             sys.exit()
     
